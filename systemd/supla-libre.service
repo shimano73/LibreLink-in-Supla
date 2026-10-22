@@ -1,0 +1,16 @@
+[Unit]
+Description=SUPLA Libre glucose channel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wyse
+Group=wyse
+WorkingDirectory=/home/wyse/libre
+ExecStart=/home/wyse/supla-device/extras/examples/linux/build/supla-device-linux -c /home/wyse/libre/supla-libre.yaml
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
