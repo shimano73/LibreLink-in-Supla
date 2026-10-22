@@ -1,0 +1,24 @@
+# sd4linux: pojedynczy kanał temperatury pobierający wartość glucose z LibreLink JSON.
+# Przed uruchomieniem uzupełnij serwer SUPLA i e-mail konta.
+name: LibreLink glucose
+log_level: info
+state_files_path: "/home/wyse/libre/supla-state"
+security_level: 0
+
+supla:
+  server: "svr123.supla.org" # podmień na serwer SUPLA przypisany do konta
+  mail: "twoj-email-konta-supla@example.com"
+  proto: 23
+
+channels:
+  - type: ThermometerParsed
+    name: libre_glucose
+    initial_caption: "Glukoza LibreLink"
+    source:
+      type: File
+      file: "/home/wyse/libre/state.json"
+      expiration_time_sec: 300
+    parser:
+      type: Json
+    temperature: "/glucose"
+
