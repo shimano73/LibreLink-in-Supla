@@ -1,0 +1,12 @@
+# Secrets, live configuration, and patient data must stay out of Git.
+.env
+.env.*
+*.env
+libre.env
+libre-wife.env
+config/supla-libre.yaml
+*.json
+*.json.tmp
+*.log
+__pycache__/
+*.py[cod]
