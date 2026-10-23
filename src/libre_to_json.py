@@ -61,11 +61,29 @@ def fetch_data():
         print("LibreLinkUp nie zwrócił profili; poprzedni JSON pozostaje bez zmian.", flush=True)
         return
 
-    previous = read_previous_profiles()
-    readings = []
+    previous_list = list(read_previous_profiles().values())
+    previous = {item["id"]: item for item in previous_list}
+    current = {}
     for patient in sorted(patients, key=lambda item: normalized_patient_name(item).casefold()):
         name = normalized_patient_name(patient) or "Profil LibreLinkUp"
         key = patient_key(patient, name)
+        current[key] = (patient, name)
+
+    # Keep existing indexes stable as SUPLA channels read /patients/N/glucose.
+    ordered_keys = [item["id"] for item in previous_list if item["id"] in current]
+    ordered_keys.extend(key for key in current if key not in previous)
+    # Keep slots for profiles no longer returned, so other channels never shift.
+    ordered_keys.extend(item["id"] for item in previous_list if item["id"] not in current)
+
+    readings = []
+    for key in ordered_keys:
+        if key not in current:
+            old = previous[key]
+            readings.append({**old, "glucose": None})
+            print(f"Profil {old.get('name', key)} nie jest teraz udostępniony; kanał pozostaje pusty.", flush=True)
+            continue
+
+        patient, name = current[key]
         try:
             measurement = client.latest(patient_identifier=patient)
             if measurement is None:
@@ -83,11 +101,8 @@ def fetch_data():
             }
             print(f"{reading['timestamp']} | {name}: {reading['glucose']} | {reading['trend']}", flush=True)
         except Exception as error:
-            reading = previous.get(key)
-            if reading is None:
-                print(f"Brak odczytu dla profilu {name}: {type(error).__name__}: {error}", flush=True)
-                continue
-            print(f"Nie udało się odświeżyć profilu {name}; zachowuję poprzedni odczyt.", flush=True)
+            reading = {**previous.get(key, {"id": key, "name": name}), "glucose": None}
+            print(f"Brak aktualnego odczytu dla profilu {name}: {type(error).__name__}: {error}", flush=True)
         readings.append(reading)
 
     if not readings:
