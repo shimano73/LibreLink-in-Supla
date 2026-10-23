@@ -1,6 +1,8 @@
 # LibreLink-in-Supla
 
-Most of the LibreLinkUp data bridge and SUPLA Linux configuration used on the Wyse host. The bridge writes the current glucose value to JSON; `sd4linux` reads `/glucose` as a temperature channel for display.
+A gateway that enables reading data from a LibreLink glucose sensor via LibreLinkUp and Supla Device for Linux. The sensor data is presented through a temperature channel, allowing it to be displayed as a widget on a smartphone.
+
+
 
 ## Files
 
