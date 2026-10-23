@@ -70,10 +70,9 @@ def fetch_data():
         current[key] = (patient, name)
 
     # Keep existing indexes stable as SUPLA channels read /patients/N/glucose.
-    ordered_keys = [item["id"] for item in previous_list if item["id"] in current]
+    ordered_keys = [item["id"] for item in previous_list]
     ordered_keys.extend(key for key in current if key not in previous)
     # Keep slots for profiles no longer returned, so other channels never shift.
-    ordered_keys.extend(item["id"] for item in previous_list if item["id"] not in current)
 
     readings = []
     for key in ordered_keys:
