@@ -13,7 +13,7 @@ A gateway that enables reading data from a LibreLink glucose sensor via LibreLin
 
 ## Configuration
 
-Copy `config/libre.env.example` to `/home/wyse/libre/libre.env`, then set these values locally. The local copy is ignored by Git:
+Copy `config/libre.env.example` to `/home/"user"/libre/libre.env`, then set these values locally. The local copy is ignored by Git:
 
 ```ini
 LIBRE_EMAIL=your-librelinkup-account@example.com
@@ -21,8 +21,8 @@ LIBRE_PASSWORD=your-secret
 LIBRE_PATIENT_NAME=Your Patient Name
 # Add after the second patient accepts the share:
 LIBRE_WIFE_PATIENT_NAME=Second Patient Name
-JSON_OUTPUT_PATH=/home/wyse/libre/state.json
-WIFE_JSON_OUTPUT_PATH=/home/wyse/libre/wife_state.json
+JSON_OUTPUT_PATH=/home/"user"/libre/state.json
+WIFE_JSON_OUTPUT_PATH=/home/"user"/libre/wife_state.json
 CHECK_INTERVAL=60
 ```
 
