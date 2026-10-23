@@ -1,37 +1,27 @@
 # LibreLinkUp → SUPLA (sd4linux)
 
-Most of the LibreLinkUp data bridge and SUPLA Linux configuration used on the Wyse host. The bridge writes the current glucose value to JSON; `sd4linux` reads `/glucose` as a temperature channel for display.
+The Python bridge reads all profiles visible to one LibreLinkUp account and writes them to one JSON file. One `sd4linux` device can expose a separate thermometer channel for each profile by reading its JSON path.
 
 ## Files
 
-- `src/libre_to_json.py` — polls one LibreLinkUp account and writes separate JSON files for the configured patient profiles.
-- `config/supla-libre.example.yaml` and `config/supla-libre-wife.example.yaml` — separate SUPLA Linux thermometer channels reading the two profile JSON files.
-- `systemd/` — service unit templates for the LibreLinkUp bridge and SUPLA device.
+- `src/libre_to_json.py` — polls every patient profile returned by LibreLinkUp and writes the latest readings to one JSON file.
+- `config/supla-libre.example.yaml` — one SUPLA Linux device with two thermometer channels reading `/patients/0/glucose` and `/patients/1/glucose`.
+- `systemd/` — service unit templates for the bridge and SUPLA device.
 - `assets/` — transparent icon source and 210×156 PNG.
 
 ## Configuration
 
-Copy `config/libre.env.example` to `/home/wyse/libre/libre.env`, then set these values locally. The local copy is ignored by Git:
+Copy `config/libre.env.example` to `/home/wyse/libre/libre.env`, then fill in the LibreLinkUp credentials. The local copy is ignored by Git. Set `JSON_OUTPUT_PATH` if the JSON file should be stored elsewhere.
 
-```ini
-LIBRE_EMAIL=your-librelinkup-account@example.com
-LIBRE_PASSWORD=your-secret
-LIBRE_PATIENT_NAME=Your Patient Name
-LIBRE_WIFE_PATIENT_NAME=Second Patient Name
-JSON_OUTPUT_PATH=/home/wyse/libre/state.json
-WIFE_JSON_OUTPUT_PATH=/home/wyse/libre/wife_state.json
-CHECK_INTERVAL=60
-```
+Copy `config/supla-libre.example.yaml` to `/home/wyse/libre/supla-libre.yaml` and set the SUPLA server and account email. The example defines two channels for two profiles. The bridge sorts profiles alphabetically by name, so channel 1 reads the first profile and channel 2 the second. Rename the captions in SUPLA to identify each person.
 
-Set `LIBRE_WIFE_PATIENT_NAME` to the full name shown in LibreLinkUp after the share appears. The bridge selects patients by exact normalized first and last name. If the profile is not visible yet or its name is ambiguous, it skips that profile and leaves its previous JSON file untouched. Your own profile continues to update. Writes use an atomic file replacement.
+The JSON contains every profile returned by LibreLinkUp, even if there are more than two. To display additional profiles as widgets, add a `ThermometerParsed` channel with the corresponding `/patients/N/glucose` path to the YAML and restart the one SUPLA service. The channel definitions are static in sd4linux YAML.
 
-To create the second SUPLA widget, copy `config/supla-libre-wife.example.yaml` to `/home/wyse/libre/supla-libre-wife.yaml`, fill in the SUPLA server and account email, and install `systemd/supla-libre-wife.service`. This instance uses its own state directory and reads `/home/wyse/libre/wife_state.json`.
-
-Before running `sd4linux`, set the real SUPLA server and account email in the YAML. Give each instance its own `state_files_path`.
+If one profile has a temporary read error, its last successful value is retained for that run. Writes use an atomic file replacement. If LibreLinkUp returns no profiles or all reads fail, the existing JSON is left untouched.
 
 ## Privacy
 
-Never commit LibreLinkUp credentials, actual glucose JSON, personal patient names, or live service configuration. Review `git diff` before pushing. The `.gitignore` excludes common env and glucose-state files.
+Never commit LibreLinkUp credentials, actual glucose JSON, patient names, or live service configuration. The `.gitignore` excludes common env and glucose-state files.
 
 ## Display note
 
