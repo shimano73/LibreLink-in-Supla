@@ -13,11 +13,11 @@ The Python bridge reads all profiles visible to one LibreLinkUp account and writ
 
 Copy `config/libre.env.example` to `/home/wyse/libre/libre.env`, then fill in the LibreLinkUp credentials. The local copy is ignored by Git. Set `JSON_OUTPUT_PATH` if the JSON file should be stored elsewhere.
 
-Copy `config/supla-libre.example.yaml` to `/home/wyse/libre/supla-libre.yaml` and set the SUPLA server and account email. The example defines two channels for two profiles. The bridge sorts profiles alphabetically by name, so channel 1 reads the first profile and channel 2 the second. Rename the captions in SUPLA to identify each person.
+Copy `config/supla-libre.example.yaml` to `/home/wyse/libre/supla-libre.yaml` and set the SUPLA server and account email. The example defines two channels for two profiles. On first run the bridge sorts profiles alphabetically by name; later it keeps existing profile indexes stable and appends newly discovered profiles. Channel 1 reads the first profile and channel 2 the second. Rename the captions in SUPLA to identify each person.
 
 The JSON contains every profile returned by LibreLinkUp, even if there are more than two. To display additional profiles as widgets, add a `ThermometerParsed` channel with the corresponding `/patients/N/glucose` path to the YAML and restart the one SUPLA service. The channel definitions are static in sd4linux YAML.
 
-If one profile has a temporary read error, its last successful value is retained for that run. Writes use an atomic file replacement. If LibreLinkUp returns no profiles or all reads fail, the existing JSON is left untouched.
+If a profile is temporarily unavailable, its array slot is retained with an empty glucose value so other people's channels do not shift into that slot. Writes use an atomic file replacement. If LibreLinkUp returns no profiles, the existing JSON is left untouched.
 
 ## Privacy
 
