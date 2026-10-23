@@ -10,10 +10,7 @@ from pylibrelinkup.api_url import APIUrl
 
 EMAIL = os.environ["LIBRE_EMAIL"]
 PASSWORD = os.environ["LIBRE_PASSWORD"]
-OWNER_NAME = " ".join(os.environ.get("LIBRE_PATIENT_NAME", "").split()).casefold()
-WIFE_NAME = " ".join(os.environ.get("LIBRE_WIFE_PATIENT_NAME", "").split()).casefold()
-OWNER_OUTPUT = Path(os.getenv("JSON_OUTPUT_PATH", "/home/wyse/libre/state.json"))
-WIFE_OUTPUT = Path(os.getenv("WIFE_JSON_OUTPUT_PATH", "/home/wyse/libre/wife_state.json"))
+OUTPUT = Path(os.getenv("JSON_OUTPUT_PATH", "/home/wyse/libre/state.json"))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "60"))
 
 TREND_MAP = {
@@ -25,74 +22,92 @@ TREND_MAP = {
     0: "Nieznany",
 }
 
-if not OWNER_NAME:
-    raise SystemExit(
-        "Brak LIBRE_PATIENT_NAME. Ustaw lokalnie pełną nazwę własnego profilu "
-        "zwracaną przez LibreLinkUp, aby po dodaniu żony nie pomylić odczytów."
-    )
-
 
 def normalized_patient_name(patient):
     first = getattr(patient, "first_name", "") or ""
     last = getattr(patient, "last_name", "") or ""
-    return " ".join(f"{first} {last}".split()).casefold()
+    return " ".join(f"{first} {last}".split())
 
 
-def write_json_atomically(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
+def patient_key(patient, name):
+    identifier = (
+        getattr(patient, "id", None)
+        or getattr(patient, "patient_id", None)
+        or getattr(patient, "identifier", None)
+    )
+    return str(identifier or name.casefold())
+
+
+def write_json_atomically(data):
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    temporary = OUTPUT.with_name(OUTPUT.name + ".tmp")
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    temporary.replace(OUTPUT)
 
 
-def read_profile(client, patients, target_name, output_path, label):
-    if not target_name:
-        return
-
-    matches = [patient for patient in patients if normalized_patient_name(patient) == target_name]
-    if not matches:
-        print(f"Profil {label} nie jest jeszcze połączony z LibreLinkUp; pomijam go, JSON bez zmian.", flush=True)
-        return
-    if len(matches) > 1:
-        print(f"Nazwa profilu {label} nie jest unikalna; pomijam zapis, JSON bez zmian.", flush=True)
-        return
-
-    measurement = client.latest(patient_identifier=matches[0])
-    if measurement is None:
-        print(f"Brak odczytu dla profilu {label}; JSON bez zmian.", flush=True)
-        return
-
-    trend = getattr(measurement, "trend", 0)
-    trend_code = getattr(trend, "value", trend)
-    data = {
-        "timestamp": datetime.now(ZoneInfo("Europe/Warsaw")).isoformat(),
-        "glucose": measurement.value,
-        "trend_code": trend_code,
-        "trend": TREND_MAP.get(trend_code, f"Kod: {trend_code}"),
-    }
-    write_json_atomically(output_path, data)
-    print(f"{data['timestamp']} | {label}: {data['glucose']} | {data['trend']}", flush=True)
+def read_previous_profiles():
+    try:
+        previous = json.loads(OUTPUT.read_text(encoding="utf-8"))
+        return {item["id"]: item for item in previous.get("patients", []) if "id" in item}
+    except (OSError, ValueError, TypeError):
+        return {}
 
 
 def fetch_data():
     client = PyLibreLinkUp(email=EMAIL, password=PASSWORD, api_url=APIUrl.EU)
     client.authenticate()
     patients = client.get_patients()
+    if not patients:
+        print("LibreLinkUp nie zwrócił profili; poprzedni JSON pozostaje bez zmian.", flush=True)
+        return
 
-    read_profile(client, patients, OWNER_NAME, OWNER_OUTPUT, "własny profil")
-    if WIFE_NAME:
-        read_profile(client, patients, WIFE_NAME, WIFE_OUTPUT, "profil żony")
-    else:
-        print("Profil żony nie jest jeszcze skonfigurowany; własny odczyt działa normalnie.", flush=True)
+    previous = read_previous_profiles()
+    readings = []
+    for patient in sorted(patients, key=lambda item: normalized_patient_name(item).casefold()):
+        name = normalized_patient_name(patient) or "Profil LibreLinkUp"
+        key = patient_key(patient, name)
+        try:
+            measurement = client.latest(patient_identifier=patient)
+            if measurement is None:
+                raise RuntimeError("brak najnowszego pomiaru")
+
+            trend = getattr(measurement, "trend", 0)
+            trend_code = getattr(trend, "value", trend)
+            reading = {
+                "id": key,
+                "name": name,
+                "glucose": measurement.value,
+                "trend_code": trend_code,
+                "trend": TREND_MAP.get(trend_code, f"Kod: {trend_code}"),
+                "timestamp": datetime.now(ZoneInfo("Europe/Warsaw")).isoformat(),
+            }
+            print(f"{reading['timestamp']} | {name}: {reading['glucose']} | {reading['trend']}", flush=True)
+        except Exception as error:
+            reading = previous.get(key)
+            if reading is None:
+                print(f"Brak odczytu dla profilu {name}: {type(error).__name__}: {error}", flush=True)
+                continue
+            print(f"Nie udało się odświeżyć profilu {name}; zachowuję poprzedni odczyt.", flush=True)
+        readings.append(reading)
+
+    if not readings:
+        print("Brak odczytów; poprzedni JSON pozostaje bez zmian.", flush=True)
+        return
+
+    write_json_atomically({
+        "timestamp": datetime.now(ZoneInfo("Europe/Warsaw")).isoformat(),
+        "patients": readings,
+    })
+    print(f"Zapisano {len(readings)} profili do: {OUTPUT}", flush=True)
 
 
 def main():
-    print(f"Odczyt własnego profilu do: {OWNER_OUTPUT}", flush=True)
+    print(f"Odczyt wszystkich profili LibreLinkUp do jednego pliku: {OUTPUT}", flush=True)
     while True:
         try:
             fetch_data()
         except Exception as error:
-            print(f"Błąd pobierania danych: {type(error).__name__}: {error}; zachowuję poprzednie pliki JSON.", flush=True)
+            print(f"Błąd pobierania danych: {type(error).__name__}: {error}; zachowuję poprzedni JSON.", flush=True)
         time.sleep(CHECK_INTERVAL)
 
 
