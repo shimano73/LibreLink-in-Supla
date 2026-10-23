@@ -1,0 +1,23 @@
+# Druga instancja sd4linux dla odczytu żony.
+# Przed uruchomieniem uzupełnij serwer SUPLA i e-mail konta.
+name: LibreLink glucose wife
+log_level: info
+state_files_path: "/home/wyse/libre/supla-wife-state"
+security_level: 0
+
+supla:
+  server: "svr123.supla.org" # ten sam serwer SUPLA przypisany do konta
+  mail: "twoj-email-konta-supla@example.com"
+  proto: 23
+
+channels:
+  - type: ThermometerParsed
+    name: libre_glucose_wife
+    initial_caption: "Glukoza LibreLink żony"
+    source:
+      type: File
+      file: "/home/wyse/libre/wife_state.json"
+      expiration_time_sec: 300
+    parser:
+      type: Json
+    temperature: "/glucose"
